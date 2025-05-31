@@ -1,0 +1,119 @@
+
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>الرحمن آٹا چکی</title>
+  <link rel="manifest" href="manifest.json">
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
+  </script>
+  <style>
+    body { font-family: 'Noto Nastaliq Urdu', serif; background: #f9f9f9; padding: 10px; font-size: 22px; }
+    .container { max-width: 650px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px #ccc; }
+    input, button { width: 100%; padding: 10px; margin-bottom: 10px; font-size: 20px; }
+    label { margin-bottom: 5px; display: block; }
+    button { background: #4CAF50; color: white; border: none; cursor: pointer; }
+    .result, .summary { background: #e0f7e9; padding: 15px; border-radius: 10px; white-space: pre-line; margin-top: 15px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 style="text-align:center;">الرحمن آٹا چکی - مکمل ورژن</h2>
+
+    <label>کسٹمر کا نام:</label>
+    <input type="text" id="customer">
+
+    <label>کل وزن (کلوگرام):</label>
+    <input type="number" id="weight">
+
+    <label>آٹے کی قیمت (فی کلوگرام):</label>
+    <input type="number" id="price" value="70">
+
+    <label>ایڈوانس آٹا (اگر کوئی):</label>
+    <input type="number" id="advance" value="0">
+
+    <label><input type="checkbox" id="noCleaning"> صفائی نہیں کروانی</label>
+    <label><input type="checkbox" id="noDeduction"> کٹوتی نہیں کروانی</label>
+    <label><input type="checkbox" id="payWithFlour"> آٹے سے بل کاٹنا ہے</label>
+
+    <button onclick="calculate()">حساب لگائیں</button>
+
+    <label>شروع تاریخ:</label>
+    <input type="date" id="startDate">
+    <label>ختم تاریخ:</label>
+    <input type="date" id="endDate">
+    <button onclick="generateReport()">رپورٹ نکالیں</button>
+    <button onclick="window.print()">رپورٹ کو PDF میں محفوظ کریں</button>
+
+    <div class="summary" id="summary" style="display:none;"></div>
+    <div class="result" id="output" style="display:none;"></div>
+  </div>
+
+<script>
+function calculate() {
+  const customer = document.getElementById("customer").value.trim() || "نام درج نہیں";
+  const weight = parseFloat(document.getElementById("weight").value);
+  const price = parseFloat(document.getElementById("price").value);
+  const advance = parseFloat(document.getElementById("advance").value) || 0;
+  const noCleaning = document.getElementById("noCleaning").checked;
+  const noDeduction = document.getElementById("noDeduction").checked;
+  const payWithFlour = document.getElementById("payWithFlour").checked;
+  const cleanRate = 40, grindRate = 130;
+  const date = new Date().toISOString().slice(0,10);
+
+  let deduction = noDeduction ? 0 : weight * 0.05;
+  let deductionCash = noDeduction ? (weight * 0.05 * price) : 0;
+  let cleaningCost = noCleaning ? 0 : (weight / 40) * cleanRate;
+  let grindingCost = (weight / 40) * grindRate;
+  let totalBill = cleaningCost + grindingCost + deductionCash;
+  let flourPayment = payWithFlour ? (totalBill / price) : 0;
+  let finalFlour = weight - deduction - advance - flourPayment;
+
+  let text = `تاریخ: ${date}
+کسٹمر: ${customer}
+اصل وزن: ${weight} کلوگرام
+${noDeduction ? `کٹوتی نہیں کی گئی، رقم شامل: Rs. ${deductionCash.toFixed(0)}` : `کٹوتی: ${deduction.toFixed(2)} کلوگرام`}
+${noCleaning ? `صفائی نہیں ہوئی` : `صفائی لاگت: Rs. ${cleaningCost.toFixed(0)}`}
+پسائی لاگت: Rs. ${grindingCost.toFixed(0)}
+کل بل: Rs. ${totalBill.toFixed(0)}
+${advance > 0 ? `ایڈوانس آٹا: ${advance} کلوگرام` : ``}
+${payWithFlour ? `بل کی ادائیگی آٹے سے: ${flourPayment.toFixed(2)} کلوگرام` : ``}
+کسٹمر کو ملنے والا آٹا: ${finalFlour.toFixed(2)} کلوگرام`;
+
+  document.getElementById("output").style.display = "block";
+  document.getElementById("output").innerText = text;
+
+  let data = JSON.parse(localStorage.getItem("attaRecords") || "[]");
+  data.unshift({date, weight, deduction, bill: totalBill});
+  localStorage.setItem("attaRecords", JSON.stringify(data));
+}
+
+function generateReport() {
+  const start = document.getElementById("startDate").value;
+  const end = document.getElementById("endDate").value;
+  if (!start || !end) return alert("تاریخ مکمل درج کریں");
+
+  const data = JSON.parse(localStorage.getItem("attaRecords") || "[]");
+  const filtered = data.filter(r => r.date >= start && r.date <= end);
+  let totalWeight = 0, totalDeduction = 0, totalBill = 0;
+  filtered.forEach(r => {
+    totalWeight += r.weight;
+    totalDeduction += r.deduction;
+    totalBill += r.bill;
+  });
+
+  const summary = `رپورٹ (${start} تا ${end}):
+کل وزن: ${totalWeight.toFixed(2)} کلوگرام
+کل کٹوتی: ${totalDeduction.toFixed(2)} کلوگرام
+کل آمدن: Rs. ${totalBill.toFixed(0)}`;
+
+  document.getElementById("summary").style.display = "block";
+  document.getElementById("summary").innerText = summary;
+}
+</script>
+</body>
+</html>
